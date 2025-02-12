@@ -1,12 +1,11 @@
-﻿using Newtonsoft.Json;
+﻿using System.Net;
+using System.Reflection;
+using System.Text;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using OpenHardwareMonitor.Hardware;
-using System.Net;
-using System.Text;
-using System.Reflection;
 
-
-namespace OpenhardwaremonitorJsonServer
+namespace hexagon_oss_OpenHardwareMonitorJsonServer
 {
     // 这是从 OpenHardwareMonitor 的 GUI 项目中复制粘贴的 Visitor 类
     // 用于遍历计算机硬件树的访问者（Visitor）模式实现
