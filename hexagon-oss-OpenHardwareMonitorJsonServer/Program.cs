@@ -1,19 +1,16 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using OpenHardwareMonitor.Hardware;
-using System;
 using System.Net;
 using System.Text;
 using System.Reflection;
-using System.Linq;
-using System.Threading.Tasks;
 
 
 namespace OpenhardwaremonitorJsonServer
 {
     // 这是从 OpenHardwareMonitor 的 GUI 项目中复制粘贴的 Visitor 类
     // 用于遍历计算机硬件树的访问者（Visitor）模式实现
-    class Visitor : IVisitor
+    internal class Visitor : IVisitor
     {
         // 访问整个计算机节点，遍历所有硬件
         public void VisitComputer(IComputer computer)
@@ -51,7 +48,7 @@ namespace OpenhardwaremonitorJsonServer
 
     // Json.NET 自定义转换器，用于将对象转换为其 ToString() 返回的字符串
     // 对于 Java 开发者来说，这类似于重写对象的 toString() 方法用于 JSON 输出
-    class ToStringJsonConverter : JsonConverter
+    internal class ToStringJsonConverter : JsonConverter
     {
         // 这里简单返回 true，表示可以转换任何类型
         public override bool CanConvert(Type objectType)
@@ -60,35 +57,35 @@ namespace OpenhardwaremonitorJsonServer
         }
 
         // 反序列化时不实现该方法（此示例仅用于序列化输出）
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
             throw new NotImplementedException();
         }
 
         // 将对象转换为字符串后写入 JSON 输出
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            writer.WriteValue(value.ToString());
+            writer.WriteValue(value?.ToString());
         }
     }
 
     // Json.NET 自定义合约解析器
     // 用于定制 JSON 序列化的行为，由于无法修改已编译库的属性注解，所以采用这种方式
-    class CustomContractResolver : DefaultContractResolver
+    internal class CustomContractResolver : DefaultContractResolver
     {
         // 重写属性创建方法，可以控制哪些属性被序列化
         protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
         {
             // 调用父类方法创建 JsonProperty 对象
-            JsonProperty property = base.CreateProperty(member, memberSerialization);
+            var property = base.CreateProperty(member, memberSerialization);
 
             // 不序列化 Values 或 Parameters 属性
             // Values 属性包含过去24小时所有传感器的读数，数据量可能非常大
             // Parameters 属性仅包含计算 Value 属性的说明字符串，通常不需要输出
-            if (property.PropertyName == "Values" || property.PropertyName == "Parameters")
+            if (property.PropertyName is "Values" or "Parameters")
             {
                 // 设置序列化时跳过该属性
-                property.ShouldSerialize = (x) => false;
+                property.ShouldSerialize = _ => false;
             }
 
             return property;
@@ -109,7 +106,7 @@ namespace OpenhardwaremonitorJsonServer
         }
     }
 
-    class Program
+    internal static class Program
     {
         public static void Main(string[] args)
         {
@@ -189,7 +186,7 @@ namespace OpenhardwaremonitorJsonServer
                 // 初始化硬件传感器（类似于打开设备资源）
                 computer.Open();
                 // 如果不开启服务器则返回内容
-                Console.WriteLine(getHardware(computer, new Visitor(), isGroup));
+                Console.WriteLine(GetHardware(computer, new Visitor(), isGroup));
 
                 computer.Accept(new Visitor());
             }
@@ -221,7 +218,7 @@ namespace OpenhardwaremonitorJsonServer
             return !defaultValue; // 如果只提供了参数名，没有提供值，对默认值取反
         }
 
-        private static string getHardware(Computer computer, Visitor visitor, bool isGroup = true)
+        private static string GetHardware(Computer computer, Visitor visitor, bool isGroup = true)
         {
             // 通过 Visitor 模式更新所有硬件传感器数据
             computer.Accept(visitor);
@@ -251,7 +248,7 @@ namespace OpenhardwaremonitorJsonServer
             }
         }
 
-        private async static Task StartServer(Computer computer, int port, bool isGroup)
+        private static async Task StartServer(Computer computer, int port, bool isGroup)
         {
             // 创建一个 Visitor 实例，用于更新硬件数据
             var visitor = new Visitor();
@@ -268,7 +265,7 @@ namespace OpenhardwaremonitorJsonServer
                 var context = await listener.GetContextAsync();
 
                 // 将分组后的字典序列化为 JSON 字符串
-                var data = getHardware(computer, visitor, isGroup);
+                var data = GetHardware(computer, visitor, isGroup);
 
                 // 将 JSON 数据转换为 UTF-8 编码的字节数组
                 var buffer = Encoding.UTF8.GetBytes(data);
@@ -281,7 +278,7 @@ namespace OpenhardwaremonitorJsonServer
                     // 指定内容类型为 JSON
                     response.AddHeader("Content-Type", "application/json");
                     // 将序列化的 JSON 数据写入响应流
-                    response.OutputStream.Write(buffer, 0, buffer.Length);
+                    await response.OutputStream.WriteAsync(buffer);
                 }
                 catch (HttpListenerException)
                 {
